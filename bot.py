@@ -14,7 +14,7 @@ from telegram.ext import (
 )
 
 from config.settings import Settings
-from integrations.google_sheets import GoogleSheetsIntegration
+from integrations.excel_api import ExcelOnlineIntegration
 from integrations.teams_api import TeamsAPIIntegration
 from integrations.telegram_bot import TelegramBotIntegration
 from middleware.auth import AuthMiddleware
@@ -47,9 +47,12 @@ class ArtificiallOpsBot:
             raise ValueError("Invalid configuration. Check .env file.")
 
         # Initialize integrations
-        self.sheets = GoogleSheetsIntegration(
-            sheet_id=Settings.GOOGLE_SHEET_ID,
-            service_account_json=Settings.GOOGLE_SERVICE_ACCOUNT_JSON,
+        self.sheets = ExcelOnlineIntegration(
+            tenant_id=Settings.MICROSOFT_TENANT_ID,
+            client_id=Settings.MICROSOFT_CLIENT_ID,
+            client_secret=Settings.MICROSOFT_CLIENT_SECRET,
+            drive_item_id=Settings.EXCEL_DRIVE_ITEM_ID,
+            user_id=Settings.MICROSOFT_ORGANIZER_ID,
         )
 
         self.teams = TeamsAPIIntegration(

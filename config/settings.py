@@ -22,11 +22,9 @@ class Settings:
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     TELEGRAM_WEBHOOK_URL: str = os.getenv("TELEGRAM_WEBHOOK_URL", "")
 
-    # Google Sheets
-    GOOGLE_SHEET_ID: str = os.getenv("GOOGLE_SHEET_ID", "")
-    GOOGLE_SERVICE_ACCOUNT_JSON: str = os.getenv(
-        "GOOGLE_SERVICE_ACCOUNT_JSON", "service_account.json"
-    )
+    # Microsoft Excel Online (OneDrive via Graph API)
+    # ID do arquivo .xlsx no OneDrive (obtido via scripts/setup_excel.py)
+    EXCEL_DRIVE_ITEM_ID: str = os.getenv("EXCEL_DRIVE_ITEM_ID", "")
 
     # Microsoft Teams (Azure AD / Graph API)
     MICROSOFT_TENANT_ID: str = os.getenv("MICROSOFT_TENANT_ID", "")
@@ -59,7 +57,7 @@ class Settings:
         """
         required_settings = [
             "TELEGRAM_BOT_TOKEN",
-            "GOOGLE_SHEET_ID",
+            "EXCEL_DRIVE_ITEM_ID",
             "MICROSOFT_TENANT_ID",
             "MICROSOFT_CLIENT_ID",
             "MICROSOFT_CLIENT_SECRET",
