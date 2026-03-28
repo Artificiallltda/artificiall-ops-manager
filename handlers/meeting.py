@@ -17,7 +17,7 @@ from typing import Optional, Tuple
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from integrations.google_sheets import GoogleSheetsIntegration
+from integrations.excel_api import ExcelOnlineIntegration
 from integrations.teams_api import TeamsAPIIntegration
 from middleware.auth import AuthMiddleware
 from middleware.logger import OperationLogger
@@ -64,7 +64,7 @@ def _parse_scheduled_args(args: list) -> Tuple[str, Optional[datetime]]:
 async def handle_reuniao(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    sheets: GoogleSheetsIntegration,
+    sheets: ExcelOnlineIntegration,
     teams: TeamsAPIIntegration,
     auth: AuthMiddleware,
     op_logger: OperationLogger,

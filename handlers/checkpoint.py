@@ -8,7 +8,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from integrations.google_sheets import GoogleSheetsIntegration
+from integrations.excel_api import ExcelOnlineIntegration
 from middleware.auth import AuthMiddleware
 from middleware.logger import OperationLogger
 from middleware.timezone import TimezoneMiddleware
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 async def handle_cheguei(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    sheets: GoogleSheetsIntegration,
+    sheets: ExcelOnlineIntegration,
     auth: AuthMiddleware,
     op_logger: OperationLogger,
     tz: TimezoneMiddleware,
@@ -131,7 +131,7 @@ async def handle_cheguei(
 async def handle_fui(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    sheets: GoogleSheetsIntegration,
+    sheets: ExcelOnlineIntegration,
     auth: AuthMiddleware,
     op_logger: OperationLogger,
     tz: TimezoneMiddleware,
