@@ -54,6 +54,8 @@ class ExcelOnlineIntegration:
         "cargo": 4,
         "ativo": 5,
         "role": 6,
+        "email": 7,
+        "username": 8,
     }
 
     PONTO_COLS = {
@@ -185,6 +187,23 @@ class ExcelOnlineIntegration:
             return None
         except Exception as e:
             logger.error(f"Error getting employee {telegram_id}: {e}")
+            return None
+
+    def get_employee_by_username(self, username: str) -> Optional[Employee]:
+        """Get active employee by Telegram username (without @)."""
+        username = username.lstrip("@").lower()
+        try:
+            rows = self._get_table_rows(self.TABLE_FUNCIONARIOS)
+            for row in rows:
+                # Username is column 8 (last)
+                if len(row) > self.FUNCIONARIOS_COLS["username"]:
+                    if str(row[self.FUNCIONARIOS_COLS["username"]]).lower() == username:
+                        ativo = str(row[self.FUNCIONARIOS_COLS["ativo"]]).lower()
+                        if ativo in ["true", "1", "sim"]:
+                            return Employee.from_row(row)
+            return None
+        except Exception as e:
+            logger.error(f"Error getting employee by username {username}: {e}")
             return None
 
     def create_employee(self, employee: Employee) -> bool:

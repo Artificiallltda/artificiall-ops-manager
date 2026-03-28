@@ -54,9 +54,9 @@ SHEETS = [
     {
         "name": "Funcionários",
         "table": "TblFuncionarios",
-        "headers": ["telegram_id", "nome", "numero", "data_cadastro", "cargo", "ativo", "role"],
-        "range": "A1:G2",
-        "sample": ["", "", "", "", "", "", ""],
+        "headers": ["telegram_id", "nome", "numero", "data_cadastro", "cargo", "ativo", "role", "email", "username"],
+        "range": "A1:I2",
+        "sample": ["", "", "", "", "", "", "", "", ""],
     },
     {
         "name": "Ponto",

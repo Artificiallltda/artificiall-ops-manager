@@ -22,61 +22,57 @@ logger = logging.getLogger(__name__)
 def parse_register_command(args: List[str]) -> Optional[dict]:
     """
     Parse /registrar command arguments.
-
-    Expected format: /registrar @username Nome Completo +5511999998888 Cargo
-
-    Args:
-        args: Command arguments list
-
-    Returns:
-        Dictionary with parsed data or None if invalid
+    Expected: /registrar @username Nome Completo +5511999998888 email@empresa.com Cargo
     """
-    if len(args) < 4:
+    if len(args) < 5:
         return None
 
-    # Extract telegram username (optional, for reference)
+    # 1. Username
     username_arg = args[0]
     username = None
     if username_arg.startswith("@"):
         username = username_arg[1:]
         args = args[1:]
 
-    # Need at least 3 more args: nome, numero, cargo
-    if len(args) < 3:
+    # 2. Email
+    email_idx = None
+    for i, arg in enumerate(args):
+        if "@" in arg and "." in arg:
+            email_idx = i
+            break
+    
+    if email_idx is None:
         return None
 
-    # Last arg is cargo (may contain spaces)
-    # Second to last is numero
-    # Everything before is nome
+    email = args[email_idx]
 
-    # Try to find phone number (should match international format)
+    # 3. Telefone (deve estar antes do email ou ser o argumento anterior)
     numero_idx = None
-    for i, arg in enumerate(args):
-        # Simple phone validation: starts with + and has digits
+    for i, arg in enumerate(args[:email_idx]):
         if re.match(r"^\+\d{10,15}$", arg.replace("-", "").replace(" ", "")):
             numero_idx = i
             break
-
-    if numero_idx is None or numero_idx == 0:
+    
+    if numero_idx is None:
         return None
-
-    # Nome is everything before numero
-    nome = " ".join(args[:numero_idx])
-
-    # Numero is at numero_idx
+    
     numero = args[numero_idx]
 
-    # Cargo is everything after numero
-    cargo = " ".join(args[numero_idx + 1:])
+    # 4. Nome (tudo antes do numero)
+    nome = " ".join(args[:numero_idx]).strip()
+
+    # 5. Cargo (tudo depois do email)
+    cargo = " ".join(args[email_idx + 1:]).strip()
 
     if not nome or not cargo:
         return None
 
     return {
         "username": username,
-        "nome": nome.strip(),
-        "numero": numero.strip(),
-        "cargo": cargo.strip(),
+        "nome": nome,
+        "numero": numero,
+        "email": email,
+        "cargo": cargo,
     }
 
 
@@ -127,66 +123,40 @@ async def handle_registrar(
     # Expected: /registrar @username Nome Completo +5511999998888 Cargo
     args = context.args or []
 
-    if len(args) < 4:
+    if len(args) < 5:
         message = (
-            "❌ Formato inválido.\n\n"
-            "Use: `/registrar @username Nome Completo +5511999998888 Cargo`\n\n"
+            "❌ *Formato inválido.*\n\n"
+            "Use: `/registrar @username Nome +55... email@empresa.com Cargo`\n\n"
             "Exemplo:\n"
-            "`/registrar @daniele Daniele Silva +5511999998888 Analista de Marketing`"
+            "`/registrar @daniele Daniele Silva +5511999998888 dani@empresa.com Analista`"
         )
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=message,
-            parse_mode="Markdown",
-        )
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
         return
 
     parsed = parse_register_command(args)
-
     if not parsed:
-        message = (
-            "❌ Não foi possível entender os dados.\n\n"
-            "Verifique se o formato está correto:\n"
-            "`/registrar @username Nome Completo +5511999998888 Cargo`"
-        )
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=message,
-            parse_mode="Markdown",
-        )
+        message = "❌ Erro ao processar os dados. Verifique o uso de e-mail e telefone."
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
         return
 
-    # Step 3: Get telegram_id from the mentioned user
-    # Use username-based pending ID for later matching
     username = parsed.get("username")
-    if username:
-        telegram_id = f"pending_{username}"  # Will be updated when user runs /register_me
-    else:
-        telegram_id = "pending"  # Fallback for no-username case
+    telegram_id = f"pending_{username}" if username else "pending"
 
-    # Step 4: Check if employee already exists by pending ID
     if username:
         existing_pending = sheets.get_employee_by_pending_id(telegram_id)
         if existing_pending:
-            message = (
-                f"⚠️ Funcionário com username **@{username}** já está cadastrado.\n\n"
-                f"Nome registrado: {existing_pending.nome}\n\n"
-                f"Use `/registrar` com outro username ou contate o administrador."
-            )
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=message,
-                parse_mode="Markdown",
-            )
+            await context.bot.send_message(chat_id=chat_id, text=f"⚠️ @{username} já registrado.")
             return
 
-    # For now, let's create the employee record
+    # Cria o objeto com os NOVOS CAMPOS
     employee = Employee(
-        telegram_id=telegram_id,  # Placeholder
+        telegram_id=telegram_id,
         nome=parsed["nome"],
         numero=parsed["numero"],
         data_cadastro=tz.get_brazil_timestamp(),
         cargo=parsed["cargo"],
+        email=parsed["email"],
+        username=username or "",
         ativo=True,
         role="funcionario",
     )
@@ -194,34 +164,19 @@ async def handle_registrar(
     success = sheets.create_employee(employee)
 
     if success:
-        # Build instruction message based on whether username was provided
-        if username:
-            instruction = (
-                f"⚠️ **Próximo passo:** Peça para **@{username}** executar o comando:\n\n"
-                f"`/register_me`\n\n"
-                f"Isso irá vincular o ID do Telegram ao registro automaticamente."
-            )
-        else:
-            instruction = (
-                f"⚠️ **Próximo passo:** O funcionário deve executar:\n\n"
-                f"`/register_me`\n\n"
-                f"Isso irá capturar o ID do Telegram e vincular ao registro."
-            )
+        instruction = (
+            f"⚠️ **Próximo passo:** Peça para **@{username}** executar `/register_me` no bot para ativar o acesso."
+            if username else "⚠️ **Próximo passo:** O funcionário deve executar `/register_me`."
+        )
 
         message = (
-            f"✅ Funcionário **{parsed['nome']}** registrado com sucesso na base da Artificiall!\n\n"
-            f"📋 Dados:\n"
-            f"• Nome: {parsed['nome']}\n"
-            f"• Cargo: {parsed['cargo']}\n"
-            f"• Telefone: {parsed['numero']}\n\n"
+            f"✅ **{parsed['nome']}** registrado!\n\n"
+            f"📧 E-mail: `{parsed['email']}`\n"
+            f"👤 Cargo: {parsed['cargo']}\n\n"
             f"{instruction}"
         )
 
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=message,
-            parse_mode="Markdown",
-        )
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
 
         op_logger.log_operation(
             command="registrar",

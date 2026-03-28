@@ -20,32 +20,42 @@ _DATE_TIME_PATTERN = re.compile(r"(\d{2}/\d{2}/\d{4})\s+(\d{2}:\d{2})")
 _EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
 
-def _parse_reuniao_args(args: List[str]) -> Tuple[str, Optional[datetime], List[str]]:
+def _parse_reuniao_args(
+    args: List[str], 
+    sheets: ExcelOnlineIntegration
+) -> Tuple[str, Optional[datetime], List[str]]:
     """
     Extrai tema, data/hora e e-mails dos argumentos.
-    
-    Formatos:
-      /reuniao [tema] [emails...]
-      /reuniao [tema] DD/MM/YYYY HH:MM [emails...]
+    Também converte @mentions em e-mails consultando o Excel.
     """
     full_text = " ".join(args)
     
-    # 1. Extrair e-mails
+    # 1. Extrair e-mails diretos
     emails = _EMAIL_PATTERN.findall(full_text)
-    # Remove os e-mails do texto para não sujar o tema
-    text_without_emails = _EMAIL_PATTERN.sub("", full_text).strip()
     
-    # 2. Extrair data/hora
-    date_match = _DATE_TIME_PATTERN.search(text_without_emails)
+    # 2. Extrair @mentions e buscar e-mails no Excel
+    mentions = re.findall(r"@(\w+)", full_text)
+    for username in mentions:
+        employee = sheets.get_employee_by_username(username)
+        if employee and employee.email:
+            if employee.email not in emails:
+                emails.append(employee.email)
+
+    # 3. Limpar o texto de e-mails e menções para processar o tema/data
+    text_without_metadata = _EMAIL_PATTERN.sub("", full_text)
+    text_without_metadata = re.sub(r"@\w+", "", text_without_metadata).strip()
+    
+    # 4. Extrair data/hora do texto limpo
+    date_match = _DATE_TIME_PATTERN.search(text_without_metadata)
     scheduled_time = None
-    tema = text_without_emails
+    tema = text_without_metadata
     
     if date_match:
         date_str, time_str = date_match.groups()
         try:
             scheduled_time = datetime.strptime(f"{date_str} {time_str}", "%d/%m/%Y %H:%M")
             # O tema é o que vem ANTES da data
-            tema = text_without_emails.split(date_str)[0].strip()
+            tema = text_without_metadata.split(date_str)[0].strip()
         except ValueError:
             pass
 
@@ -87,7 +97,7 @@ async def handle_reuniao(
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
         return
 
-    tema, scheduled_time, emails = _parse_reuniao_args(args)
+    tema, scheduled_time, emails = _parse_reuniao_args(args, sheets)
 
     if not tema:
         await context.bot.send_message(chat_id=chat_id, text="❌ Informe o tema da reunião.")

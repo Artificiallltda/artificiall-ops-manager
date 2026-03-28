@@ -85,19 +85,20 @@ HTML_CONTENT = """
 
     <div class="section" style="border-left-color: #28a745;">
         <div class="section-title">🎥 Reuniões e Vídeo</div>
-        <p><span class="command">/reuniao [tema]</span> : Cria um link imediato do Microsoft Teams no chat.</p>
-        <p><span class="command">/reuniao [tema] DD/MM/AAAA HH:MM</span> : Agenda uma reunião futura.</p>
+        <p><span class="command">/reuniao [tema] [@usuario ou e-mail]</span> : Cria convite no Outlook e Teams.</p>
+        <p><span class="command">/reuniao [tema] DD/MM/AAAA HH:MM [@usuario]</span> : Agenda reunião futura.</p>
+        <p><i>Nota: O bot converte automaticamente @nomedeusuario no e-mail cadastrado.</i></p>
     </div>
 
     <div class="section" style="border-left-color: #ffc107;">
         <div class="section-title">⚖️ Governança e Decisões</div>
-        <p><span class="command">/decisao [texto]</span> : (Apenas CEO) Registra uma decisão estratégica no banco de dados.</p>
+        <p><span class="command">/decisao [texto]</span> : (CEO) Registra decisões estratégicas no Excel.</p>
     </div>
 
     <div class="section" style="border-left-color: #6c757d;">
         <div class="section-title">🛠️ Administração</div>
-        <p><span class="command">/registrar @usuario Nome Cargo</span> : (Apenas Admins) Cadastra novos colaboradores.</p>
-        <p><span class="command">/help</span> : Mostra a lista resumida de comandos ativos.</p>
+        <p><span class="command">/registrar @usuario Nome Telefone E-mail Cargo</span> : Cadastra novo colaborador.</p>
+        <p><span class="command">/help</span> : Lista de comandos ativos.</p>
     </div>
 
     <div class="footer">
