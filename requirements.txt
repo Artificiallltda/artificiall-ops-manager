@@ -1,0 +1,8 @@
+python-telegram-bot>=20.0
+gspread>=5.9.0
+google-auth>=2.20.0
+google-auth-oauthlib>=1.0.0
+requests-oauthlib>=1.3.1
+pytz>=2023.3
+python-dotenv>=1.0.0
+aiox-core>=1.0.0

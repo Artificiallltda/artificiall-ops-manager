@@ -1,0 +1,9 @@
+{
+  "name": "Artificiall Ops Manager",
+  "version": "1.0.0",
+  "description": "Bot de Gestão Operacional via Telegram + AIOX",
+  "author": "Gean Santos (CEO)",
+  "platform": "AIOX",
+  "integrations": ["Telegram", "Google Sheets", "Zoom"],
+  "commands": ["/cheguei", "/fui", "/registrar", "/reuniao", "/decisao"]
+}
