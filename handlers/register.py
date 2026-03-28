@@ -258,7 +258,7 @@ async def handle_register_me(
                     f"📋 Agora você já pode usar:\n"
                     f"• `/cheguei` - Registrar entrada\n"
                     f"• `/fui` - Registrar saída\n"
-                    f"• `/reuniao` - Criar reunião Zoom"
+                    f"• `/reuniao` - Criar reunião no Teams/Outlook"
                 )
                 await context.bot.send_message(
                     chat_id=chat_id,
