@@ -127,87 +127,79 @@ class TeamsAPIIntegration:
             logger.error(f"Microsoft Graph API request failed: {e}")
             raise
 
-    def create_meeting(
+    def create_calendar_event(
         self,
-        topic: str,
+        subject: str,
         start_time: datetime,
         duration: int = 60,
-        timezone: str = "America/Sao_Paulo",
+        attendees: list = None,
+        content: str = "Reunião agendada via Artificiall Ops Manager."
     ) -> Dict:
         """
-        Create a new Microsoft Teams online meeting.
-
-        The meeting is created as an 'ad-hoc' VOIP meeting using the
-        Graph API endpoint POST /communications/onlineMeetings.
+        Create a new Outlook Calendar event with an integrated Teams meeting link.
 
         Args:
-            topic: Meeting subject/title
-            start_time: Meeting start time (datetime object)
-            duration: Meeting duration in minutes (default: 60)
-            timezone: Timezone string (default: America/Sao_Paulo)
+            subject: Event title
+            start_time: Start time (datetime object)
+            duration: Duration in minutes
+            attendees: List of email addresses to invite
+            content: Body text for the meeting invite
 
         Returns:
-            Dictionary with meeting details:
-            {
-                "join_url": str,  (Teams join link)
-                "id": str,
-                "subject": str,
-            }
+            Dictionary with event details
         """
         end_time = start_time + timedelta(minutes=duration)
-
-        # Graph API exige formato ISO 8601 com timezone UTC (sufixo Z)
+        
+        # Format for ISO 8601 with Z suffix (UTC)
         start_str = start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
         end_str = end_time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        meeting_payload = {
-            "subject": topic,
-            "startDateTime": start_str,
-            "endDateTime": end_str,
-            "participants": {
-                "organizer": {
-                    "upn": "",
-                    "identity": {
-                        "user": {
-                            "id": self.organizer_user_id
-                        }
-                    }
-                }
-            }
+        # Prepare attendees list
+        attendee_list = []
+        if attendees:
+            for email in attendees:
+                attendee_list.append({
+                    "emailAddress": {
+                        "address": email
+                    },
+                    "type": "required"
+                })
+
+        event_payload = {
+            "subject": subject,
+            "body": {
+                "contentType": "HTML",
+                "content": content
+            },
+            "start": {
+                "dateTime": start_str,
+                "timeZone": "UTC"
+            },
+            "end": {
+                "dateTime": end_str,
+                "timeZone": "UTC"
+            },
+            "attendees": attendee_list,
+            "isOnlineMeeting": True,
+            "onlineMeetingProvider": "teamsForBusiness"
         }
 
         try:
-            # Endpoint correto para Application permissions:
-            # requer organizer_user_id e politica de acesso configurada no Teams.
             if not self.organizer_user_id:
-                raise ValueError(
-                    "MICROSOFT_ORGANIZER_ID nao configurado. "
-                    "Adicione o Object ID do usuario organizador no .env."
-                )
+                raise ValueError("MICROSOFT_ORGANIZER_ID nao configurado.")
 
-            endpoint = f"/users/{self.organizer_user_id}/onlineMeetings"
-            response = self._make_request("POST", endpoint, meeting_payload)
+            endpoint = f"/users/{self.organizer_user_id}/events"
+            response = self._make_request("POST", endpoint, event_payload)
 
-            join_url = response.get("joinWebUrl", "")
-            meeting_id = response.get("id", "")
-            subject = response.get("subject", topic)
-
-            if not join_url:
-                raise ValueError("Microsoft Graph did not return a valid joinWebUrl")
-
-            result = {
-                "join_url": join_url,
-                "id": meeting_id,
-                "subject": subject,
+            return {
+                "id": response.get("id"),
+                "join_url": response.get("onlineMeeting", {}).get("joinUrl"),
+                "subject": response.get("subject"),
+                "start": response.get("start", {}).get("dateTime"),
+                "web_link": response.get("webLink") # Link para o evento no Outlook Web
             }
-
-            logger.info(
-                f"Teams meeting created successfully: '{topic}' (ID: {meeting_id})"
-            )
-            return result
-
         except Exception as e:
-            logger.error(f"Failed to create Teams meeting: {e}")
+            logger.error(f"Failed to create Calendar event: {e}")
             raise
 
     def test_connection(self) -> bool:
