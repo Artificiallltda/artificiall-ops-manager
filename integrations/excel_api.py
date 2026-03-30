@@ -241,8 +241,8 @@ class ExcelOnlineIntegration:
             logger.error(f"Error creating employee: {e}")
             return False
 
-    def update_employee_telegram_id(self, pending_id: str, telegram_id: str) -> bool:
-        """Update pending placeholder ID to actual Telegram ID."""
+    def update_employee_field(self, search_term: str, field_index: int, new_value: str) -> bool:
+        """Update a specific field of an employee found by username or name."""
         try:
             endpoint = self._workbook_url(f"/tables/{self.TABLE_FUNCIONARIOS}/rows")
             resp = self._make_request("GET", endpoint)
@@ -250,20 +250,40 @@ class ExcelOnlineIntegration:
 
             for row in rows:
                 values = row["values"][0]
-                if str(values[self.FUNCIONARIOS_COLS["telegram_id"]]) == pending_id:
+                current_username = str(values[self.FUNCIONARIOS_COLS["username"]]).lower() if len(values) > self.FUNCIONARIOS_COLS["username"] else ""
+                current_name = str(values[self.FUNCIONARIOS_COLS["nome"]]).lower() if len(values) > self.FUNCIONARIOS_COLS["nome"] else ""
+                current_telegram_id = str(values[self.FUNCIONARIOS_COLS["telegram_id"]]).lower() if len(values) > self.FUNCIONARIOS_COLS["telegram_id"] else ""
+
+                search_lower = search_term.lower()
+                # Procura por nome, username (com ou sem pending_)
+                if (
+                    search_lower in current_name
+                    or search_lower == current_username
+                    or search_lower == current_telegram_id
+                    or f"pending_{search_lower}" == current_telegram_id
+                ):
                     row_index = row["index"]
                     update_endpoint = self._workbook_url(
                         f"/tables/{self.TABLE_FUNCIONARIOS}/rows/itemAt(index={row_index})"
                     )
                     new_values = list(values)
-                    new_values[self.FUNCIONARIOS_COLS["telegram_id"]] = telegram_id
+                    
+                    # Ensure list is long enough for the field we want to update
+                    while len(new_values) <= field_index:
+                        new_values.append("")
+                        
+                    new_values[field_index] = new_value
                     self._make_request("PATCH", update_endpoint, {"values": [new_values]})
-                    logger.info(f"Updated telegram_id from '{pending_id}' to '{telegram_id}'")
+                    logger.info(f"Updated employee field {field_index} to '{new_value}' for search term '{search_term}'")
                     return True
             return False
         except Exception as e:
-            logger.error(f"Error updating employee telegram_id: {e}")
+            logger.error(f"Error updating employee field: {e}")
             return False
+
+    def update_employee_telegram_id(self, pending_id: str, telegram_id: str) -> bool:
+        """Update pending placeholder ID to actual Telegram ID. (Legacy/Specific method)"""
+        return self.update_employee_field(pending_id, self.FUNCIONARIOS_COLS["telegram_id"], telegram_id)
 
     def get_employee_by_pending_id(self, pending_id: str) -> Optional[Employee]:
         """Get employee by pending placeholder ID."""

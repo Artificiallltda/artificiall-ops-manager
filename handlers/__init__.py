@@ -4,10 +4,11 @@ Handlers package for Artificiall Ops Manager.
 Exports all command handlers for external use.
 """
 
-from handlers.checkpoint import handle_cheguei, handle_fui
-from handlers.register import handle_registrar, handle_register_me
-from handlers.meeting import handle_reuniao
-from handlers.decision import handle_decisao
+from .checkpoint import handle_cheguei, handle_fui
+from .register import handle_registrar, handle_register_me
+from .meeting import handle_reuniao
+from .decision import handle_decisao
+from .update_employee import handle_atualizar
 
 __all__ = [
     "handle_cheguei",
@@ -16,4 +17,5 @@ __all__ = [
     "handle_register_me",
     "handle_reuniao",
     "handle_decisao",
+    "handle_atualizar",
 ]

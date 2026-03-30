@@ -27,6 +27,7 @@ from handlers import (
     handle_register_me,
     handle_reuniao,
     handle_decisao,
+    handle_atualizar,
 )
 
 # Configure logging
@@ -102,6 +103,9 @@ class ArtificiallOpsBot:
         )
         self.application.add_handler(
             CommandHandler("register_me", self._register_me_handler)
+        )
+        self.application.add_handler(
+            CommandHandler("atualizar", self._atualizar_handler)
         )
 
         # Reuniões Teams
@@ -186,6 +190,21 @@ class ArtificiallOpsBot:
             self.tz,
         )
 
+    async def _atualizar_handler(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Handle /atualizar command."""
+        await handle_atualizar(
+            update,
+            context,
+            self.sheets,
+            self.auth,
+            self.op_logger,
+            self.tz,
+        )
+
     async def _reuniao_handler(
         self,
         update: Update,
@@ -232,7 +251,8 @@ class ArtificiallOpsBot:
             "`/cheguei` - Registrar entrada\n"
             "`/fui` - Registrar saída\n\n"
             "👥 *Funcionários:*\n"
-            "`/registrar @user Nome +5511999998888 Cargo` - Cadastrar funcionário (Admin)\n\n"
+            "`/registrar @user Nome +5511999998888 Cargo` - Cadastrar funcionário (Admin)\n"
+            "`/atualizar @user campo novo_valor` - Editar cadastro (Admin)\n\n"
             "🎥 *Reuniões:*\n"
             "`/reuniao [tema]` - Criar reunião no Teams agora\n"
             "`/reuniao [tema] DD/MM/AAAA HH:MM` - Agendar reunião\n\n"
