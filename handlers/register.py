@@ -276,9 +276,14 @@ async def handle_register_me(
         if username:
             username = username.lower()
             pending_employee = sheets.get_employee_by_pending_id(f"pending_{username}")
+            
+            if not pending_employee:
+                # Se não achou na coluna telegram_id como pending_*, tenta achar na coluna username
+                pending_employee = sheets.get_employee_by_username(username)
+                
             if pending_employee:
-                # Update telegram_id
-                success = sheets.update_employee_telegram_id(f"pending_{username}", telegram_id)
+                # Update telegram_id na linha do funcionário
+                success = sheets.update_employee_field(username, sheets.FUNCIONARIOS_COLS["telegram_id"], telegram_id)
                 if success:
                     message = (
                         f"✅ Cadastro atualizado com sucesso, **`{pending_employee.nome}`**!\n\n"
