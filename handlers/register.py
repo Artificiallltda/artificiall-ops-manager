@@ -34,35 +34,32 @@ def parse_register_command(args: List[str]) -> Optional[dict]:
         username = username_arg[1:]
         args = args[1:]
 
+    # Join the rest to search using regex
+    text = " ".join(args)
+
     # 2. Email
-    email_idx = None
-    for i, arg in enumerate(args):
-        if "@" in arg and "." in arg:
-            email_idx = i
-            break
-    
-    if email_idx is None:
+    email_match = re.search(r"[\w.+-]+@[\w.-]+\.\w+", text)
+    if not email_match:
         return None
+    email = email_match.group(0)
 
-    email = args[email_idx]
-
-    # 3. Telefone (deve estar antes do email ou ser o argumento anterior)
-    numero_idx = None
-    for i, arg in enumerate(args[:email_idx]):
-        if re.match(r"^\+\d{10,15}$", arg.replace("-", "").replace(" ", "")):
-            numero_idx = i
-            break
-    
-    if numero_idx is None:
+    # 3. Telefone: procura por um + seguido por digitos, espacos e hifens.
+    phone_match = re.search(r"\+[\d\s\-]{10,20}", text)
+    if not phone_match:
         return None
     
-    numero = args[numero_idx]
+    numero_raw = phone_match.group(0).strip()
+    numero_digits = re.sub(r"[^\d]", "", numero_raw)
+    if len(numero_digits) < 10:
+        return None
+    numero = "+" + numero_digits
 
-    # 4. Nome (tudo antes do numero)
-    nome = " ".join(args[:numero_idx]).strip()
+    # 4. Nome e Cargo
+    phone_start = text.find(phone_match.group(0))
+    nome = text[:phone_start].strip()
 
-    # 5. Cargo (tudo depois do email)
-    cargo = " ".join(args[email_idx + 1:]).strip()
+    email_end = text.find(email) + len(email)
+    cargo = text[email_end:].strip()
 
     if not nome or not cargo:
         return None

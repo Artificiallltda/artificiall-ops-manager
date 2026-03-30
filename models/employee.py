@@ -107,10 +107,12 @@ class Employee:
 
     def to_row(self) -> list[Any]:
         """Converte instância em lista para escrita no Excel."""
+        numero_str = f"'{self.numero}" if self.numero.startswith("+") else self.numero
+
         return [
             self.telegram_id,
             self.nome,
-            self.numero,
+            numero_str,
             self.data_cadastro.strftime("%d/%m/%Y %H:%M:%S"),
             self.cargo,
             "TRUE" if self.ativo else "FALSE",

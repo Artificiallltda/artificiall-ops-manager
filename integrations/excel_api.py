@@ -140,6 +140,8 @@ class ExcelOnlineIntegration:
         response = requests.request(
             method=method, url=url, headers=headers, json=data, timeout=30
         )
+        if response.status_code not in (200, 201, 204):
+            logger.error(f"Graph API Error ({response.status_code}): {response.text}")
         response.raise_for_status()
         if response.status_code == 204 or not response.content:
             return {}
@@ -164,7 +166,7 @@ class ExcelOnlineIntegration:
 
     def _append_table_row(self, table_name: str, values: list) -> bool:
         """Append a row to a workbook table."""
-        endpoint = self._workbook_url(f"/tables/{table_name}/rows/add")
+        endpoint = self._workbook_url(f"/tables/{table_name}/rows")
         try:
             self._make_request("POST", endpoint, {"values": [values]})
             return True
