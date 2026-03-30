@@ -25,6 +25,11 @@ from models.decision import Decision
 logger = logging.getLogger(__name__)
 
 
+class ExcelReadOnlyError(Exception):
+    """Exception raised when the Excel drive is in Read-Only mode."""
+    pass
+
+
 class ExcelOnlineIntegration:
     """
     Integration with Microsoft Excel Online via Microsoft Graph API.
@@ -145,10 +150,17 @@ class ExcelOnlineIntegration:
         if response.status_code not in (200, 201, 204):
             error_text = response.text
             if "EditModeCannotAcquireLock" in error_text:
-                logger.error(
-                    "Graph API ERRO DE ARQUIVO ABERTO: O arquivo Excel no OneDrive está aberto ou bloqueado. "
-                    "Feche a janela do Excel para que o bot possa gravar os dados."
-                )
+                if "SiteReadOnly" in error_text or "Database Is Read Only" in error_text:
+                    logger.error(
+                        "⚠️ ERRO CRÍTICO: O site do SharePoint/OneDrive está em modo SOMENTE LEITURA. "
+                        "Isso geralmente indica que a cota foi atingida ou o site foi bloqueado administrativemente."
+                    )
+                    raise ExcelReadOnlyError("O site do SharePoint está em modo somente leitura (Database Is Read Only).")
+                else:
+                    logger.error(
+                        "Graph API ERRO DE ARQUIVO ABERTO: O arquivo Excel no OneDrive está aberto ou bloqueado. "
+                        "Feche a janela do Excel para que o bot possa gravar os dados."
+                    )
             logger.error(f"Graph API Error ({response.status_code}): {error_text}")
         response.raise_for_status()
         if response.status_code == 204 or not response.content:
@@ -168,6 +180,8 @@ class ExcelOnlineIntegration:
             resp = self._make_request("GET", endpoint)
             rows = resp.get("value", [])
             return [r["values"][0] for r in rows]
+        except ExcelReadOnlyError:
+            raise
         except Exception as e:
             logger.error(f"Error reading table {table_name}: {e}")
             return []
@@ -178,6 +192,8 @@ class ExcelOnlineIntegration:
         try:
             self._make_request("POST", endpoint, {"values": [values]})
             return True
+        except ExcelReadOnlyError:
+            raise
         except Exception as e:
             logger.error(f"Error appending to table {table_name}: {e}")
             return False
@@ -254,7 +270,7 @@ class ExcelOnlineIntegration:
         try:
             rows = self._get_table_rows(self.TABLE_FUNCIONARIOS)
             for row in rows:
-                if str(row[self.FUNCIONARIOS_COLS["telegram_id"]]) == pending_id:
+                if str(row[self.FUNCIONARIOS_COLS["telegram_id"]]).lower() == pending_id.lower():
                     ativo = str(row[self.FUNCIONARIOS_COLS["ativo"]]).lower()
                     if ativo in ["true", "1", "sim"]:
                         return Employee.from_row(row)

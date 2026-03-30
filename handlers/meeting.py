@@ -6,7 +6,7 @@ from typing import Optional, Tuple, List
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from integrations.excel_api import ExcelOnlineIntegration
+from integrations.excel_api import ExcelOnlineIntegration, ExcelReadOnlyError
 from integrations.teams_api import TeamsAPIIntegration
 from middleware.auth import AuthMiddleware
 from middleware.logger import OperationLogger
@@ -79,16 +79,28 @@ async def handle_reuniao(
     user_name = update.effective_user.first_name or "Usuário"
     username = update.effective_user.username
 
-    employee = sheets.get_employee(telegram_id)
-    if not employee:
-        message = "⚠️ Você não está cadastrado. Apenas funcionários registrados podem agendar reuniões."
-        await context.bot.send_message(chat_id=chat_id, text=message)
-        op_logger.log_warning(
-            command="reuniao",
-            telegram_id=telegram_id,
-            user_name=user_name,
-            warning="Unregistered user attempted to create meeting",
+    try:
+        employee = sheets.get_employee(telegram_id)
+        if not employee:
+            message = "⚠️ Você não está cadastrado. Apenas funcionários registrados podem agendar reuniões."
+            await context.bot.send_message(chat_id=chat_id, text=message)
+            op_logger.log_warning(
+                command="reuniao",
+                telegram_id=telegram_id,
+                user_name=user_name,
+                warning="Unregistered user attempted to create meeting",
+            )
+            return
+    except ExcelReadOnlyError as e:
+        message = (
+            "⚠️ **ERRO: Banco de Dados em Modo de Leitura**\n\n"
+            "Não foi possível verificar seu cadastro porque o OneDrive está bloqueado pela Microsoft."
         )
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
+        return
+    except Exception as e:
+        logger.error(f"Error checking employee: {e}")
+        await context.bot.send_message(chat_id=chat_id, text="❌ Erro ao validar acesso.")
         return
 
     display_name = employee.nome if employee else user_name
@@ -108,7 +120,19 @@ async def handle_reuniao(
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
         return
 
-    tema, scheduled_time, emails = _parse_reuniao_args(args, sheets)
+    try:
+        tema, scheduled_time, emails = _parse_reuniao_args(args, sheets)
+    except ExcelReadOnlyError as e:
+        message = (
+            "⚠️ **ERRO: Banco de Dados em Modo de Leitura**\n\n"
+            "Não foi possível processar @menções porque o OneDrive está bloqueado."
+        )
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
+        return
+    except Exception as e:
+        logger.error(f"Error parsing meeting args: {e}")
+        await context.bot.send_message(chat_id=chat_id, text="❌ Erro ao processar argumentos.")
+        return
 
     if not tema:
         await context.bot.send_message(chat_id=chat_id, text="❌ Informe o tema da reunião.")

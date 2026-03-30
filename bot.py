@@ -98,6 +98,9 @@ class ArtificiallOpsBot:
             CommandHandler("registrar", self._registrar_handler)
         )
         self.application.add_handler(
+            CommandHandler("registrar_me", self._register_me_handler)
+        )
+        self.application.add_handler(
             CommandHandler("register_me", self._register_me_handler)
         )
 

@@ -8,7 +8,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from integrations.excel_api import ExcelOnlineIntegration
+from integrations.excel_api import ExcelOnlineIntegration, ExcelReadOnlyError
 from middleware.auth import AuthMiddleware
 from middleware.logger import OperationLogger
 from middleware.timezone import TimezoneMiddleware
@@ -124,42 +124,51 @@ async def handle_decisao(
     )
 
     # Step 5: Save to Google Sheets
-    success = sheets.create_decision(decision)
+    try:
+        success = sheets.create_decision(decision)
 
-    if success:
+        if success:
+            message = (
+                f"✅ Decisão registrada com sucesso no log de compliance.\n\n"
+                f"🆔 **ID:** `{decision.id}`\n"
+                f"📅 **Data:** {tz.format_timestamp(decision.data)}\n"
+                f"📋 **Categoria:** {categoria or 'Geral'}\n\n"
+                f"_Registro auditável e imutável._"
+            )
+
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode="Markdown",
+            )
+
+            # CRITICAL: Log this operation with highest priority
+            op_logger.log_critical(
+                command="decisao",
+                telegram_id=telegram_id,
+                user_name=user_name,
+                message="Executive decision registered",
+                details={
+                    "decision_id": decision.id,
+                    "categoria": categoria or "Geral",
+                    "ceo_telegram_id": telegram_id,
+                    "text_length": len(decisao_texto),
+                },
+            )
+        else:
+            raise Exception("Failed to create decision record")
+    except ExcelReadOnlyError as e:
         message = (
-            f"✅ Decisão registrada com sucesso no log de compliance.\n\n"
-            f"🆔 **ID:** `{decision.id}`\n"
-            f"📅 **Data:** {tz.format_timestamp(decision.data)}\n"
-            f"📋 **Categoria:** {categoria or 'Geral'}\n\n"
-            f"_Registro auditável e imutável._"
+            "⚠️ **ERRO: Banco de Dados em Modo de Leitura**\n\n"
+            "Não foi possível registrar a decisão porque o OneDrive está bloqueado para escrita pela Microsoft.\n\n"
+            "O bot não consegue gravar novos dados no momento."
         )
-
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=message,
-            parse_mode="Markdown",
-        )
-
-        # CRITICAL: Log this operation with highest priority
-        # SECURITY: Do NOT log full decision text to avoid exposing sensitive information
-        op_logger.log_critical(
-            command="decisao",
-            telegram_id=telegram_id,
-            user_name=user_name,
-            message="Executive decision registered",
-            details={
-                "decision_id": decision.id,
-                "categoria": categoria or "Geral",
-                "ceo_telegram_id": telegram_id,
-                "text_length": len(decisao_texto),  # Only length, not content
-                # SECURITY: decision_text is NOT logged to protect sensitive information
-            },
-        )
-    else:
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
+        op_logger.log_error(command="decisao", telegram_id=telegram_id, user_name=user_name, error=str(e))
+    except Exception as e:
         message = (
             "❌ Erro ao registrar decisão.\n\n"
-            "Por favor, tente novamente ou verifique a configuração do Google Sheets."
+            "Por favor, tente novamente ou contate o administrador."
         )
         await context.bot.send_message(
             chat_id=chat_id,
@@ -171,10 +180,9 @@ async def handle_decisao(
             command="decisao",
             telegram_id=telegram_id,
             user_name=user_name,
-            error="Failed to create decision record",
+            error=str(e),
             details={
-                # SECURITY: decision_text is NOT logged even in error cases
                 "categoria": categoria or "Geral",
-                "text_length": len(decisao_texto),  # Apenas tamanho, não conteúdo
+                "text_length": len(decisao_texto),
             },
         )

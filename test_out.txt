@@ -1,0 +1,119 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Artificiall\GeanAIOX\Artificiall Ops Manager
+plugins: anyio-4.12.1, langsmith-0.7.12, asyncio-1.3.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 9 items
+
+tests\test_handlers.py ...FF...F                                         [100%]
+
+================================== FAILURES ===================================
+________________ TestRegisterCommand.test_parse_register_valid ________________
+
+self = <tests.test_handlers.TestRegisterCommand object at 0x0000014BD39736B0>
+
+    def test_parse_register_valid(self):
+        """Testar parse de comando válido."""
+        args = ["@daniele", "Daniele", "Silva", "+5511999998888", "Analista"]
+    
+        result = parse_register_command(args)
+    
+>       assert result is not None
+E       assert None is not None
+
+tests\test_handlers.py:137: AssertionError
+_____________ TestRegisterCommand.test_parse_register_no_username _____________
+
+self = <tests.test_handlers.TestRegisterCommand object at 0x0000014BD39735F0>
+
+    def test_parse_register_no_username(self):
+        """Testar parse sem username."""
+        args = ["Daniele", "Silva", "+5511999998888", "Analista"]
+    
+        result = parse_register_command(args)
+    
+>       assert result is not None
+E       assert None is not None
+
+tests\test_handlers.py:149: AssertionError
+________________ TestDecisionHandler.test_decisao_ceo_success _________________
+
+self = <tests.test_handlers.TestDecisionHandler object at 0x0000014BD3973CB0>
+mock_dependencies = {'auth': <MagicMock id='1425185389504'>, 'op_logger': <MagicMock id='1425185249648'>, 'sheets': <MagicMock id='1425185332432'>, 'tz': <middleware.timezone.TimezoneMiddleware object at 0x0000014BD3A927E0>}
+
+    @pytest.mark.asyncio
+    async def test_decisao_ceo_success(self, mock_dependencies):
+        """Testar /decisao quando CEO registra decisão."""
+        mock_dependencies["sheets"].create_decision.return_value = True
+    
+        update = MagicMock()
+        update.effective_user.id = 999999999
+        update.effective_chat.id = 987654321
+    
+        context = MagicMock()
+        context.args = ["Aprovo a contratação de João"]
+        context.bot.send_message = AsyncMock()
+    
+        from handlers.decision import handle_decisao
+    
+        # Execute
+>       await handle_decisao(
+            update,
+            context,
+            mock_dependencies["sheets"],
+            mock_dependencies["auth"],
+            mock_dependencies["op_logger"],
+            mock_dependencies["tz"],
+        )
+
+tests\test_handlers.py:236: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+handlers\decision.py:118: in handle_decisao
+    decision = Decision(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <[AttributeError("'Decision' object has no attribute 'categoria'") raised in repr()] Decision object at 0x14bd3ad4e90>
+data = datetime.datetime(2026, 3, 30, 10, 30, 26, 853710, tzinfo=<DstTzInfo 'America/Sao_Paulo' -03-1 day, 21:00:00 STD>)
+decisao = 'Aprovo a contratação de João'
+registrado_por = <MagicMock name='mock.effective_user.first_name' id='1425176119440'>
+ceo_telegram_id = '999999999', categoria = 'RH', id = None
+
+    def __init__(
+        self,
+        data: datetime,
+        decisao: str,
+        registrado_por: str,
+        ceo_telegram_id: str,
+        categoria: Optional[str] = None,
+        id: Optional[str] = None
+    ) -> None:
+        """
+        Inicializa uma instância de Decision.
+    
+        Args:
+            data: Data e hora do registro.
+            decisao: Texto da decisão (mínimo 10 caracteres).
+            registrado_por: Nome de quem registrou.
+            ceo_telegram_id: ID do CEO no Telegram.
+            categoria: Categoria opcional da decisão.
+            id: UUID da decisão (gerado automaticamente se None).
+    
+        Raises:
+            ValueError: Se algum campo obrigatório estiver inválido.
+        """
+        if not isinstance(data, datetime):
+            raise ValueError("data deve ser um objeto datetime")
+        if not decisao or not isinstance(decisao, str):
+            raise ValueError("decisao deve ser uma string não vazia")
+        if len(decisao) < 10:
+            raise ValueError("decisao deve ter pelo menos 10 caracteres")
+        if not registrado_por or not isinstance(registrado_por, str):
+>           raise ValueError("registrado_por deve ser uma string não vazia")
+E           ValueError: registrado_por deve ser uma string não vazia
+
+models\decision.py:57: ValueError
+=========================== short test summary info ===========================
+FAILED tests/test_handlers.py::TestRegisterCommand::test_parse_register_valid
+FAILED tests/test_handlers.py::TestRegisterCommand::test_parse_register_no_username
+FAILED tests/test_handlers.py::TestDecisionHandler::test_decisao_ceo_success
+========================= 3 failed, 6 passed in 0.41s =========================

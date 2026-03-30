@@ -8,7 +8,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from integrations.excel_api import ExcelOnlineIntegration
+from integrations.excel_api import ExcelOnlineIntegration, ExcelReadOnlyError
 from middleware.auth import AuthMiddleware
 from middleware.logger import OperationLogger
 from middleware.timezone import TimezoneMiddleware
@@ -45,70 +45,81 @@ async def handle_cheguei(
     user_name = update.effective_user.first_name or "Usuário"
 
     # Step 1: Check if user is registered
-    employee = sheets.get_employee(telegram_id)
+    try:
+        employee = sheets.get_employee(telegram_id)
 
-    if not employee:
-        # User not registered
-        message = (
-            "❌ Você não está cadastrado.\n\n"
-            "Peça ao administrador para te registrar com o comando:\n"
-            "`/registrar @seuusuario [Nome Completo] [Número] [Cargo]`"
-        )
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=message,
-            parse_mode="Markdown",
-        )
+        if not employee:
+            # User not registered
+            message = (
+                "❌ Você não está cadastrado.\n\n"
+                "Peça ao administrador para te registrar com o comando:\n"
+                "`/registrar @seuusuario [Nome Completo] [Número] [Cargo]`"
+            )
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode="Markdown",
+            )
 
-        op_logger.log_warning(
-            command="cheguei",
+            op_logger.log_warning(
+                command="cheguei",
+                telegram_id=telegram_id,
+                user_name=user_name,
+                warning="User not registered",
+            )
+            return
+
+        # Step 2: Get current timestamp in Brazil timezone
+        now = tz.get_brazil_timestamp()
+
+        # Step 3: Create timesheet entry
+        entry = TimesheetEntry(
             telegram_id=telegram_id,
-            user_name=user_name,
-            warning="User not registered",
+            nome=employee.nome,
+            tipo="Entrada",
+            timestamp=now,
         )
-        return
 
-    # Step 2: Get current timestamp in Brazil timezone
-    now = tz.get_brazil_timestamp()
+        # Step 4: Log to Google Sheets
+        success = sheets.log_timesheet(entry)
 
-    # Step 3: Create timesheet entry
-    entry = TimesheetEntry(
-        telegram_id=telegram_id,
-        nome=employee.nome,
-        tipo="Entrada",
-        timestamp=now,
-    )
+        if success:
+            # Format response message
+            timestamp_str = tz.format_timestamp(now, "%d/%m/%Y às %H:%M")
 
-    # Step 4: Log to Google Sheets
-    success = sheets.log_timesheet(entry)
+            message = (
+                f"✅ Ponto de entrada registrado, {employee.nome}!\n\n"
+                f"🕐 Horário: {timestamp_str}\n"
+                f"📍 Fuso: {tz.TIMEZONE_NAME}"
+            )
 
-    if success:
-        # Format response message
-        timestamp_str = tz.format_timestamp(now, "%d/%m/%Y às %H:%M")
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode="Markdown",
+            )
 
+            op_logger.log_operation(
+                command="cheguei",
+                telegram_id=telegram_id,
+                user_name=employee.nome,
+                action="timesheet_entry_created",
+                details={
+                    "type": "Entrada",
+                    "timestamp": entry.timestamp.isoformat(),
+                },
+            )
+        else:
+            raise Exception("Failed to log timesheet entry")
+    except ExcelReadOnlyError as e:
         message = (
-            f"✅ Ponto de entrada registrado, {employee.nome}!\n\n"
-            f"🕐 Horário: {timestamp_str}\n"
-            f"📍 Fuso: {tz.TIMEZONE_NAME}"
+            "⚠️ **ERRO: Banco de Dados em Modo de Leitura**\n\n"
+            "O OneDrive/SharePoint da Artificiall foi colocado em modo 'Somente Leitura' pela Microsoft.\n\n"
+            "O bot não consegue gravar novos dados até que a conta seja liberada (vencimento de licença ou espaço cheio)."
         )
-
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=message,
-            parse_mode="Markdown",
-        )
-
-        op_logger.log_operation(
-            command="cheguei",
-            telegram_id=telegram_id,
-            user_name=employee.nome,
-            action="timesheet_entry_created",
-            details={
-                "type": "Entrada",
-                "timestamp": entry.timestamp.isoformat(),
-            },
-        )
-    else:
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
+        op_logger.log_error(command="cheguei", telegram_id=telegram_id, user_name=user_name, error=str(e))
+    except Exception as e:
         # Error logging timesheet
         message = (
             "❌ Erro ao registrar ponto.\n\n"
@@ -123,8 +134,8 @@ async def handle_cheguei(
         op_logger.log_error(
             command="cheguei",
             telegram_id=telegram_id,
-            user_name=employee.nome,
-            error="Failed to log timesheet entry",
+            user_name=user_name,
+            error=f"Failed to log timesheet entry: {e}",
         )
 
 
@@ -155,70 +166,81 @@ async def handle_fui(
     user_name = update.effective_user.first_name or "Usuário"
 
     # Step 1: Check if user is registered
-    employee = sheets.get_employee(telegram_id)
+    try:
+        employee = sheets.get_employee(telegram_id)
 
-    if not employee:
-        # User not registered
-        message = (
-            "❌ Você não está cadastrado.\n\n"
-            "Peça ao administrador para te registrar com o comando:\n"
-            "`/registrar @seuusuario [Nome Completo] [Número] [Cargo]`"
-        )
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=message,
-            parse_mode="Markdown",
-        )
+        if not employee:
+            # User not registered
+            message = (
+                "❌ Você não está cadastrado.\n\n"
+                "Peça ao administrador para te registrar com o comando:\n"
+                "`/registrar @seuusuario [Nome Completo] [Número] [Cargo]`"
+            )
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode="Markdown",
+            )
 
-        op_logger.log_warning(
-            command="fui",
+            op_logger.log_warning(
+                command="fui",
+                telegram_id=telegram_id,
+                user_name=user_name,
+                warning="User not registered",
+            )
+            return
+
+        # Step 2: Get current timestamp in Brazil timezone
+        now = tz.get_brazil_timestamp()
+
+        # Step 3: Create timesheet entry
+        entry = TimesheetEntry(
             telegram_id=telegram_id,
-            user_name=user_name,
-            warning="User not registered",
+            nome=employee.nome,
+            tipo="Saída",
+            timestamp=now,
         )
-        return
 
-    # Step 2: Get current timestamp in Brazil timezone
-    now = tz.get_brazil_timestamp()
+        # Step 4: Log to Google Sheets
+        success = sheets.log_timesheet(entry)
 
-    # Step 3: Create timesheet entry
-    entry = TimesheetEntry(
-        telegram_id=telegram_id,
-        nome=employee.nome,
-        tipo="Saída",
-        timestamp=now,
-    )
+        if success:
+            # Format response message
+            timestamp_str = tz.format_timestamp(now, "%d/%m/%Y às %H:%M")
 
-    # Step 4: Log to Google Sheets
-    success = sheets.log_timesheet(entry)
+            message = (
+                f"✅ Ponto de saída registrado, {employee.nome}!\n\n"
+                f"🕐 Horário: {timestamp_str}\n"
+                f"📍 Fuso: {tz.TIMEZONE_NAME}"
+            )
 
-    if success:
-        # Format response message
-        timestamp_str = tz.format_timestamp(now, "%d/%m/%Y às %H:%M")
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode="Markdown",
+            )
 
+            op_logger.log_operation(
+                command="fui",
+                telegram_id=telegram_id,
+                user_name=employee.nome,
+                action="timesheet_exit_created",
+                details={
+                    "type": "Saída",
+                    "timestamp": entry.timestamp.isoformat(),
+                },
+            )
+        else:
+            raise Exception("Failed to log timesheet exit")
+    except ExcelReadOnlyError as e:
         message = (
-            f"✅ Ponto de saída registrado, {employee.nome}!\n\n"
-            f"🕐 Horário: {timestamp_str}\n"
-            f"📍 Fuso: {tz.TIMEZONE_NAME}"
+            "⚠️ **ERRO: Banco de Dados em Modo de Leitura**\n\n"
+            "O OneDrive/SharePoint da Artificiall foi colocado em modo 'Somente Leitura' pela Microsoft.\n\n"
+            "O bot não consegue gravar novos dados até que a conta seja liberada."
         )
-
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=message,
-            parse_mode="Markdown",
-        )
-
-        op_logger.log_operation(
-            command="fui",
-            telegram_id=telegram_id,
-            user_name=employee.nome,
-            action="timesheet_exit_created",
-            details={
-                "type": "Saída",
-                "timestamp": entry.timestamp.isoformat(),
-            },
-        )
-    else:
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
+        op_logger.log_error(command="fui", telegram_id=telegram_id, user_name=user_name, error=str(e))
+    except Exception as e:
         # Error logging timesheet
         message = (
             "❌ Erro ao registrar ponto.\n\n"
@@ -233,6 +255,6 @@ async def handle_fui(
         op_logger.log_error(
             command="fui",
             telegram_id=telegram_id,
-            user_name=employee.nome,
-            error="Failed to log timesheet exit",
+            user_name=user_name,
+            error=f"Failed to log timesheet exit: {e}",
         )

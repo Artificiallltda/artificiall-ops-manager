@@ -10,7 +10,7 @@ from typing import List, Optional
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from integrations.excel_api import ExcelOnlineIntegration
+from integrations.excel_api import ExcelOnlineIntegration, ExcelReadOnlyError
 from middleware.auth import AuthMiddleware
 from middleware.logger import OperationLogger
 from middleware.timezone import TimezoneMiddleware
@@ -136,74 +136,87 @@ async def handle_registrar(
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
         return
 
-    username = parsed.get("username")
+    username = parsed.get("username").lower() if parsed.get("username") else None
     telegram_id = f"pending_{username}" if username else "pending"
 
-    if username:
-        existing_pending = sheets.get_employee_by_pending_id(telegram_id)
-        if existing_pending:
-            await context.bot.send_message(chat_id=chat_id, text=f"⚠️ @{username} já registrado.")
-            return
-
-    # Check if name is already registered to avoid duplicates (QA-M02)
-    # Using existing data logic
     try:
-        rows = sheets._get_table_rows(sheets.TABLE_FUNCIONARIOS)
-        for row in rows:
-            if len(row) > sheets.FUNCIONARIOS_COLS["nome"]:
-                if str(row[sheets.FUNCIONARIOS_COLS["nome"]]).strip().lower() == parsed["nome"].strip().lower():
-                    await context.bot.send_message(
-                        chat_id=chat_id, 
-                        text=f"⚠️ Funcionário **{parsed['nome']}** já está cadastrado no sistema.",
-                        parse_mode="Markdown"
-                    )
-                    return
-    except Exception as e:
-        logger.warning(f"Duplicate check failed: {e}")
+        if username:
+            existing_pending = sheets.get_employee_by_pending_id(telegram_id)
+            if existing_pending:
+                await context.bot.send_message(chat_id=chat_id, text=f"⚠️ @{username} já registrado.")
+                return
 
-    # Cria o objeto com os NOVOS CAMPOS
-    employee = Employee(
-        telegram_id=telegram_id,
-        nome=parsed["nome"],
-        numero=parsed["numero"],
-        data_cadastro=tz.get_brazil_timestamp(),
-        cargo=parsed["cargo"],
-        email=parsed["email"],
-        username=username or "",
-        ativo=True,
-        role="funcionario",
-    )
+        # Check if name is already registered to avoid duplicates (QA-M02)
+        # Using existing data logic
+        try:
+            rows = sheets._get_table_rows(sheets.TABLE_FUNCIONARIOS)
+            for row in rows:
+                if len(row) > sheets.FUNCIONARIOS_COLS["nome"]:
+                    if str(row[sheets.FUNCIONARIOS_COLS["nome"]]).strip().lower() == parsed["nome"].strip().lower():
+                        await context.bot.send_message(
+                            chat_id=chat_id, 
+                            text=f"⚠️ Funcionário **{parsed['nome']}** já está cadastrado no sistema.",
+                            parse_mode="Markdown"
+                        )
+                        return
+        except ExcelReadOnlyError:
+            raise
+        except Exception as e:
+            logger.warning(f"Duplicate check failed: {e}")
 
-    success = sheets.create_employee(employee)
-
-    if success:
-        instruction = (
-            f"⚠️ **Próximo passo:** Peça para **@{username}** executar `/register_me` no bot para ativar o acesso."
-            if username else "⚠️ **Próximo passo:** O funcionário deve executar `/register_me`."
+        # Cria o objeto com os NOVOS CAMPOS
+        employee = Employee(
+            telegram_id=telegram_id,
+            nome=parsed["nome"],
+            numero=parsed["numero"],
+            data_cadastro=tz.get_brazil_timestamp(),
+            cargo=parsed["cargo"],
+            email=parsed["email"],
+            username=username or "",
+            ativo=True,
+            role="funcionario",
         )
 
+        success = sheets.create_employee(employee)
+
+        if success:
+            instruction = (
+                f"⚠️ **Próximo passo:** Peça para **@{username}** executar `/register_me` no bot para ativar o acesso."
+                if username else "⚠️ **Próximo passo:** O funcionário deve executar `/register_me`."
+            )
+
+            message = (
+                f"✅ **{parsed['nome']}** registrado!\n\n"
+                f"📧 E-mail: `{parsed['email']}`\n"
+                f"👤 Cargo: {parsed['cargo']}\n\n"
+                f"{instruction}"
+            )
+
+            await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
+
+            op_logger.log_operation(
+                command="registrar",
+                telegram_id=admin_telegram_id,
+                user_name=admin_name,
+                action="employee_created",
+                details={
+                    "employee_name": parsed["nome"],
+                    "cargo": parsed["cargo"],
+                    "numero": parsed["numero"],
+                    "registered_by": admin_name,
+                },
+            )
+        else:
+            raise Exception("Failed to create employee record")
+    except ExcelReadOnlyError as e:
         message = (
-            f"✅ **{parsed['nome']}** registrado!\n\n"
-            f"📧 E-mail: `{parsed['email']}`\n"
-            f"👤 Cargo: {parsed['cargo']}\n\n"
-            f"{instruction}"
+            "⚠️ **ERRO: Banco de Dados em Modo de Leitura**\n\n"
+            "Não foi possível registrar o funcionário porque o OneDrive está bloqueado para escrita pela Microsoft.\n\n"
+            "Verifique o espaço em disco ou o status da conta."
         )
-
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
-
-        op_logger.log_operation(
-            command="registrar",
-            telegram_id=admin_telegram_id,
-            user_name=admin_name,
-            action="employee_created",
-            details={
-                "employee_name": parsed["nome"],
-                "cargo": parsed["cargo"],
-                "numero": parsed["numero"],
-                "registered_by": admin_name,
-            },
-        )
-    else:
+        op_logger.log_error(command="registrar", telegram_id=admin_telegram_id, user_name=admin_name, error=str(e))
+    except Exception as e:
         message = (
             "❌ Erro ao registrar funcionário.\n\n"
             "Verifique se o funcionário já não está cadastrado ou contate o administrador."
@@ -218,7 +231,7 @@ async def handle_registrar(
             command="registrar",
             telegram_id=admin_telegram_id,
             user_name=admin_name,
-            error="Failed to create employee record",
+            error=str(e),
         )
 
 
@@ -243,80 +256,91 @@ async def handle_register_me(
     user_name = update.effective_user.first_name or "Usuário"
 
     # Step 1: Check if already registered with actual telegram_id
-    existing = sheets.get_employee(telegram_id)
-    if existing:
+    try:
+        existing = sheets.get_employee(telegram_id)
+        if existing:
+            message = (
+                f"✅ Você já está cadastrado como **{existing.nome}**.\n\n"
+                f"📋 Cargo: {existing.cargo}\n"
+                f"📅 Cadastro: {tz.format_timestamp(existing.data_cadastro)}"
+            )
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode="Markdown",
+            )
+            return
+
+        # Step 2: Check if there's a pending record with this username
+        username = update.effective_user.username
+        if username:
+            username = username.lower()
+            pending_employee = sheets.get_employee_by_pending_id(f"pending_{username}")
+            if pending_employee:
+                # Update telegram_id
+                success = sheets.update_employee_telegram_id(f"pending_{username}", telegram_id)
+                if success:
+                    message = (
+                        f"✅ Cadastro atualizado com sucesso, **{pending_employee.nome}**!\n\n"
+                        f"Seu ID do Telegram foi vinculado ao seu registro.\n\n"
+                        f"📋 Agora você já pode usar:\n"
+                        f"• `/cheguei` - Registrar entrada\n"
+                        f"• `/fui` - Registrar saída\n"
+                        f"• `/reuniao` - Criar reunião no Teams/Outlook"
+                    )
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text=message,
+                        parse_mode="Markdown",
+                    )
+
+                    op_logger.log_operation(
+                        command="register_me",
+                        telegram_id=telegram_id,
+                        user_name=user_name,
+                        action="employee_telegram_id_updated",
+                        details={
+                            "employee_name": pending_employee.nome,
+                            "previous_id": f"pending_{username}",
+                            "new_id": telegram_id,
+                        },
+                    )
+                    return
+
+        # Step 3: No pending record - create new self-registration
+        # Ask user to provide details or notify admin
         message = (
-            f"✅ Você já está cadastrado como **{existing.nome}**.\n\n"
-            f"📋 Cargo: {existing.cargo}\n"
-            f"📅 Cadastro: {tz.format_timestamp(existing.data_cadastro)}"
+            f"📋 **Auto-registro iniciado, {user_name}!**\n\n"
+            f"Seu ID do Telegram: `{telegram_id}`\n\n"
+            f"Um administrador deve completar seu cadastro com:\n"
+            f"• Nome completo\n"
+            f"• Cargo\n"
+            f"• Telefone\n\n"
+            f"_Após o cadastro, use `/cheguei` ou `/fui` para registrar seu ponto._"
         )
         await context.bot.send_message(
             chat_id=chat_id,
             text=message,
             parse_mode="Markdown",
         )
-        return
 
-    # Step 2: Check if there's a pending record with this username
-    username = update.effective_user.username
-    if username:
-        pending_employee = sheets.get_employee_by_pending_id(f"pending_{username}")
-        if pending_employee:
-            # Update telegram_id
-            success = sheets.update_employee_telegram_id(f"pending_{username}", telegram_id)
-            if success:
-                message = (
-                    f"✅ Cadastro atualizado com sucesso, **{pending_employee.nome}**!\n\n"
-                    f"Seu ID do Telegram foi vinculado ao seu registro.\n\n"
-                    f"📋 Agora você já pode usar:\n"
-                    f"• `/cheguei` - Registrar entrada\n"
-                    f"• `/fui` - Registrar saída\n"
-                    f"• `/reuniao` - Criar reunião no Teams/Outlook"
-                )
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=message,
-                    parse_mode="Markdown",
-                )
-
-                op_logger.log_operation(
-                    command="register_me",
-                    telegram_id=telegram_id,
-                    user_name=user_name,
-                    action="employee_telegram_id_updated",
-                    details={
-                        "employee_name": pending_employee.nome,
-                        "previous_id": f"pending_{username}",
-                        "new_id": telegram_id,
-                    },
-                )
-                return
-
-    # Step 3: No pending record - create new self-registration
-    # Ask user to provide details or notify admin
-    message = (
-        f"📋 **Auto-registro iniciado, {user_name}!**\n\n"
-        f"Seu ID do Telegram: `{telegram_id}`\n\n"
-        f"Um administrador deve completar seu cadastro com:\n"
-        f"• Nome completo\n"
-        f"• Cargo\n"
-        f"• Telefone\n\n"
-        f"_Após o cadastro, use `/cheguei` ou `/fui` para registrar seu ponto._"
-    )
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=message,
-        parse_mode="Markdown",
-    )
-
-    # Notify admins (optional - log for now)
-    op_logger.log_operation(
-        command="register_me",
-        telegram_id=telegram_id,
-        user_name=user_name,
-        action="employee_self_registration_initiated",
-        details={
-            "username": username,
-            "status": "pending_admin_completion",
-        },
-    )
+        # Notify admins (optional - log for now)
+        op_logger.log_operation(
+            command="register_me",
+            telegram_id=telegram_id,
+            user_name=user_name,
+            action="employee_self_registration_initiated",
+            details={
+                "username": username,
+                "status": "pending_admin_completion",
+            },
+        )
+    except ExcelReadOnlyError as e:
+        message = (
+            "⚠️ **ERRO: Banco de Dados em Modo de Leitura**\n\n"
+            "Não foi possível completar seu cadastro porque o OneDrive está bloqueado para escrita pela Microsoft."
+        )
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
+    except Exception as e:
+        op_logger.log_error(command="register_me", telegram_id=telegram_id, user_name=user_name, error=str(e))
+        await context.bot.send_message(chat_id=chat_id, text="❌ Erro ao processar registro.")
