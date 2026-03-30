@@ -160,11 +160,14 @@ async def handle_reuniao(
 
         # Resposta no Telegram
         data_fmt = start_time.strftime("%d/%m/%Y às %H:%M")
-        attendees_text = f"\n📧 **Participantes convidados:** {', '.join(emails)}" if emails else ""
+        
+        # Escapar e-mails em crases individuais para segurança
+        emails_fmt = [f"`{e}`" for e in emails]
+        attendees_text = f"\n📧 **Participantes convidados:** {', '.join(emails_fmt)}" if emails else ""
         
         status_text = "agendada" if is_scheduled else "iniciada"
         message = (
-            f"🗓️ {mention}, a reunião **'{tema}'** foi {status_text} no **Calendário do Outlook**.\n\n"
+            f"🗓️ {mention}, a reunião **`'{tema}'`** foi {status_text} no **Calendário do Outlook**.\n\n"
             f"🕐 **Horário:** {data_fmt}\n"
             f"📌 **Link Teams:** [Ingressar na Reunião]({join_url})\n"
             f"🔗 **Ver no Outlook:** [Abrir Evento]({web_link})"

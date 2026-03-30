@@ -132,15 +132,18 @@ async def handle_decisao(
                 f"✅ Decisão registrada com sucesso no log de compliance.\n\n"
                 f"🆔 **ID:** `{decision.id}`\n"
                 f"📅 **Data:** {tz.format_timestamp(decision.data)}\n"
-                f"📋 **Categoria:** {categoria or 'Geral'}\n\n"
+                f"📋 **Categoria:** `{categoria or 'Geral'}`\n\n"
                 f"_Registro auditável e imutável._"
             )
 
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=message,
-                parse_mode="Markdown",
-            )
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=message,
+                    parse_mode="Markdown",
+                )
+            except Exception as msg_err:
+                logger.warning(f"Failed to send success message, but decision was logged: {msg_err}")
 
             # CRITICAL: Log this operation with highest priority
             op_logger.log_critical(

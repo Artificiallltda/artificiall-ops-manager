@@ -88,16 +88,19 @@ async def handle_cheguei(
             timestamp_str = tz.format_timestamp(now, "%d/%m/%Y às %H:%M")
 
             message = (
-                f"✅ Ponto de entrada registrado, {employee.nome}!\n\n"
+                f"✅ Ponto de entrada registrado, `{employee.nome}`!\n\n"
                 f"🕐 Horário: {timestamp_str}\n"
-                f"📍 Fuso: {tz.TIMEZONE_NAME}"
+                f"📍 Fuso: `{tz.TIMEZONE_NAME}`"
             )
 
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=message,
-                parse_mode="Markdown",
-            )
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=message,
+                    parse_mode="Markdown",
+                )
+            except Exception as msg_err:
+                logger.warning(f"Failed to send success message, but entry was logged: {msg_err}")
 
             op_logger.log_operation(
                 command="cheguei",
@@ -209,16 +212,19 @@ async def handle_fui(
             timestamp_str = tz.format_timestamp(now, "%d/%m/%Y às %H:%M")
 
             message = (
-                f"✅ Ponto de saída registrado, {employee.nome}!\n\n"
+                f"✅ Ponto de saída registrado, `{employee.nome}`!\n\n"
                 f"🕐 Horário: {timestamp_str}\n"
-                f"📍 Fuso: {tz.TIMEZONE_NAME}"
+                f"📍 Fuso: `{tz.TIMEZONE_NAME}`"
             )
 
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=message,
-                parse_mode="Markdown",
-            )
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=message,
+                    parse_mode="Markdown",
+                )
+            except Exception as msg_err:
+                logger.warning(f"Failed to send success message, but exit was logged: {msg_err}")
 
             op_logger.log_operation(
                 command="fui",

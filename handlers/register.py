@@ -186,9 +186,9 @@ async def handle_registrar(
             )
 
             message = (
-                f"✅ **{parsed['nome']}** registrado!\n\n"
+                f"✅ **`{parsed['nome']}`** registrado!\n\n"
                 f"📧 E-mail: `{parsed['email']}`\n"
-                f"👤 Cargo: {parsed['cargo']}\n\n"
+                f"👤 Cargo: `{parsed['cargo']}`\n\n"
                 f"{instruction}"
             )
 
@@ -260,8 +260,8 @@ async def handle_register_me(
         existing = sheets.get_employee(telegram_id)
         if existing:
             message = (
-                f"✅ Você já está cadastrado como **{existing.nome}**.\n\n"
-                f"📋 Cargo: {existing.cargo}\n"
+                f"✅ Você já está cadastrado como **`{existing.nome}`**.\n\n"
+                f"📋 Cargo: `{existing.cargo}`\n"
                 f"📅 Cadastro: {tz.format_timestamp(existing.data_cadastro)}"
             )
             await context.bot.send_message(
@@ -281,7 +281,7 @@ async def handle_register_me(
                 success = sheets.update_employee_telegram_id(f"pending_{username}", telegram_id)
                 if success:
                     message = (
-                        f"✅ Cadastro atualizado com sucesso, **{pending_employee.nome}**!\n\n"
+                        f"✅ Cadastro atualizado com sucesso, **`{pending_employee.nome}`**!\n\n"
                         f"Seu ID do Telegram foi vinculado ao seu registro.\n\n"
                         f"📋 Agora você já pode usar:\n"
                         f"• `/cheguei` - Registrar entrada\n"
