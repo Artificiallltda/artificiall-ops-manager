@@ -80,6 +80,17 @@ async def handle_reuniao(
     username = update.effective_user.username
 
     employee = sheets.get_employee(telegram_id)
+    if not employee:
+        message = "⚠️ Você não está cadastrado. Apenas funcionários registrados podem agendar reuniões."
+        await context.bot.send_message(chat_id=chat_id, text=message)
+        op_logger.log_warning(
+            command="reuniao",
+            telegram_id=telegram_id,
+            user_name=user_name,
+            warning="Unregistered user attempted to create meeting",
+        )
+        return
+
     display_name = employee.nome if employee else user_name
     mention = f"@{username}" if username else display_name
 

@@ -145,6 +145,22 @@ async def handle_registrar(
             await context.bot.send_message(chat_id=chat_id, text=f"⚠️ @{username} já registrado.")
             return
 
+    # Check if name is already registered to avoid duplicates (QA-M02)
+    # Using existing data logic
+    try:
+        rows = sheets._get_table_rows(sheets.TABLE_FUNCIONARIOS)
+        for row in rows:
+            if len(row) > sheets.FUNCIONARIOS_COLS["nome"]:
+                if str(row[sheets.FUNCIONARIOS_COLS["nome"]]).strip().lower() == parsed["nome"].strip().lower():
+                    await context.bot.send_message(
+                        chat_id=chat_id, 
+                        text=f"⚠️ Funcionário **{parsed['nome']}** já está cadastrado no sistema.",
+                        parse_mode="Markdown"
+                    )
+                    return
+    except Exception as e:
+        logger.warning(f"Duplicate check failed: {e}")
+
     # Cria o objeto com os NOVOS CAMPOS
     employee = Employee(
         telegram_id=telegram_id,

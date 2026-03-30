@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Optional, List
 
 import requests
+from tenacity import retry, wait_exponential, stop_after_attempt
 
 from models.employee import Employee
 from models.timesheet import TimesheetEntry
@@ -130,6 +131,7 @@ class ExcelOnlineIntegration:
         self._token_expires_at = datetime.now() + timedelta(seconds=token_data.get("expires_in", 3600))
         return self._access_token
 
+    @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3))
     def _make_request(self, method: str, endpoint: str, data=None) -> dict:
         """Make authenticated request to Microsoft Graph API."""
         url = f"{self.GRAPH_BASE_URL}{endpoint}"
@@ -141,7 +143,13 @@ class ExcelOnlineIntegration:
             method=method, url=url, headers=headers, json=data, timeout=30
         )
         if response.status_code not in (200, 201, 204):
-            logger.error(f"Graph API Error ({response.status_code}): {response.text}")
+            error_text = response.text
+            if "EditModeCannotAcquireLock" in error_text:
+                logger.error(
+                    "Graph API ERRO DE ARQUIVO ABERTO: O arquivo Excel no OneDrive está aberto ou bloqueado. "
+                    "Feche a janela do Excel para que o bot possa gravar os dados."
+                )
+            logger.error(f"Graph API Error ({response.status_code}): {error_text}")
         response.raise_for_status()
         if response.status_code == 204 or not response.content:
             return {}

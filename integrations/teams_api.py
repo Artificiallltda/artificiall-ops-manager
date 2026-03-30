@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict
 
 import requests
+from tenacity import retry, wait_exponential, stop_after_attempt
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,7 @@ class TeamsAPIIntegration:
             logger.error(f"Unexpected error obtaining Microsoft Graph token: {e}")
             raise
 
+    @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3))
     def _make_request(
         self, method: str, endpoint: str, data: Optional[Dict] = None
     ) -> Dict:

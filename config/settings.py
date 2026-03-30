@@ -61,6 +61,7 @@ class Settings:
             "MICROSOFT_TENANT_ID",
             "MICROSOFT_CLIENT_ID",
             "MICROSOFT_CLIENT_SECRET",
+            "MICROSOFT_ORGANIZER_ID",
             "CEO_TELEGRAM_ID",
         ]
 

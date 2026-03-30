@@ -130,7 +130,7 @@ class TestRegisterCommand:
 
     def test_parse_register_valid(self):
         """Testar parse de comando válido."""
-        args = ["@daniele", "Daniele", "Silva", "+5511999998888", "Analista"]
+        args = ["@daniele", "Daniele", "Silva", "+5511999998888", "test@test.com", "Analista"]
 
         result = parse_register_command(args)
 
@@ -138,17 +138,19 @@ class TestRegisterCommand:
         assert result["username"] == "daniele"
         assert result["nome"] == "Daniele Silva"
         assert result["numero"] == "+5511999998888"
+        assert result["email"] == "test@test.com"
         assert result["cargo"] == "Analista"
 
     def test_parse_register_no_username(self):
         """Testar parse sem username."""
-        args = ["Daniele", "Silva", "+5511999998888", "Analista"]
+        args = ["Daniele", "Silva", "+5511999998888", "test@test.com", "Analista"]
 
         result = parse_register_command(args)
 
         assert result is not None
         assert result["username"] is None
         assert result["nome"] == "Daniele Silva"
+        assert result["email"] == "test@test.com"
 
     def test_parse_register_invalid_phone(self):
         """Testar parse com telefone inválido."""
@@ -224,6 +226,7 @@ class TestDecisionHandler:
 
         update = MagicMock()
         update.effective_user.id = 999999999
+        update.effective_user.first_name = "Gean"
         update.effective_chat.id = 987654321
 
         context = MagicMock()

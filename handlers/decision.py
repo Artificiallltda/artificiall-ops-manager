@@ -117,7 +117,7 @@ async def handle_decisao(
     # Step 4: Create decision record
     decision = Decision(
         decisao=decisao_texto,
-        registrado_por="Gean Santos",  # CEO name from PRD
+        registrado_por=user_name,
         ceo_telegram_id=telegram_id,
         categoria=categoria,
         data=tz.get_brazil_timestamp(),
@@ -146,7 +146,7 @@ async def handle_decisao(
         op_logger.log_critical(
             command="decisao",
             telegram_id=telegram_id,
-            user_name="Gean Santos",
+            user_name=user_name,
             message="Executive decision registered",
             details={
                 "decision_id": decision.id,
@@ -170,7 +170,7 @@ async def handle_decisao(
         op_logger.log_error(
             command="decisao",
             telegram_id=telegram_id,
-            user_name="Gean Santos",
+            user_name=user_name,
             error="Failed to create decision record",
             details={
                 # SECURITY: decision_text is NOT logged even in error cases

@@ -120,11 +120,15 @@ class OperationLogger:
         Returns:
             Dictionary with log entry data
         """
+        safe_telegram_id = telegram_id
+        if level == "ERROR" and telegram_id:
+            safe_telegram_id = f"***{telegram_id[-4:]}" if len(telegram_id) > 4 else "***"
+
         return {
             "timestamp": self._get_timestamp(),
             "level": level,
             "command": command,
-            "telegram_id": telegram_id,
+            "telegram_id": safe_telegram_id,
             "user_name": user_name,
             "action": action,
             "details": details or {},

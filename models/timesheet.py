@@ -7,7 +7,7 @@ de entrada ou saída de funcionário no sistema Artificiall Ops Manager.
 
 from __future__ import annotations
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any, Optional
 
 
@@ -35,7 +35,7 @@ class TimesheetEntry:
         timestamp: datetime,
         timezone: str = "America/Sao_Paulo",
         id: Optional[str] = None,
-        data: Optional[datetime] = None
+        data: Optional[date] = None
     ) -> None:
         """
         Inicializa uma instância de TimesheetEntry.
