@@ -22,7 +22,8 @@ _EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
 def _parse_reuniao_args(
     args: List[str], 
-    sheets: ExcelOnlineIntegration
+    sheets: ExcelOnlineIntegration,
+    tz: TimezoneMiddleware
 ) -> Tuple[str, Optional[datetime], List[str]]:
     """
     Extrai tema, data/hora e e-mails dos argumentos.
@@ -53,7 +54,7 @@ def _parse_reuniao_args(
     if date_match:
         date_str, time_str = date_match.groups()
         try:
-            scheduled_time = datetime.strptime(f"{date_str} {time_str}", "%d/%m/%Y %H:%M")
+            scheduled_time = tz.parse_timestamp(f"{date_str} {time_str}", "%d/%m/%Y %H:%M")
             # O tema é o que vem ANTES da data
             tema = text_without_metadata.split(date_str)[0].strip()
         except ValueError:
@@ -121,7 +122,7 @@ async def handle_reuniao(
         return
 
     try:
-        tema, scheduled_time, emails = _parse_reuniao_args(args, sheets)
+        tema, scheduled_time, emails = _parse_reuniao_args(args, sheets, tz)
     except ExcelReadOnlyError as e:
         message = (
             "⚠️ **ERRO: Banco de Dados em Modo de Leitura**\n\n"
