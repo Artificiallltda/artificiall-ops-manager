@@ -223,7 +223,8 @@ class ExcelOnlineIntegration:
             for row in rows:
                 # Username is column 8 (last)
                 if len(row) > self.FUNCIONARIOS_COLS["username"]:
-                    if str(row[self.FUNCIONARIOS_COLS["username"]]).lower() == username:
+                    current_uname = str(row[self.FUNCIONARIOS_COLS["username"]]).lower().lstrip("@")
+                    if current_uname == username:
                         ativo = str(row[self.FUNCIONARIOS_COLS["ativo"]]).lower()
                         if ativo in ["true", "1", "sim"]:
                             return Employee.from_row(row)
@@ -250,11 +251,11 @@ class ExcelOnlineIntegration:
 
             for row in rows:
                 values = row["values"][0]
-                current_username = str(values[self.FUNCIONARIOS_COLS["username"]]).lower() if len(values) > self.FUNCIONARIOS_COLS["username"] else ""
+                current_username = str(values[self.FUNCIONARIOS_COLS["username"]]).lower().lstrip("@") if len(values) > self.FUNCIONARIOS_COLS["username"] else ""
                 current_name = str(values[self.FUNCIONARIOS_COLS["nome"]]).lower() if len(values) > self.FUNCIONARIOS_COLS["nome"] else ""
                 current_telegram_id = str(values[self.FUNCIONARIOS_COLS["telegram_id"]]).lower() if len(values) > self.FUNCIONARIOS_COLS["telegram_id"] else ""
 
-                search_lower = search_term.lower()
+                search_lower = search_term.lower().lstrip("@")
                 # Procura por nome, username (com ou sem pending_)
                 if (
                     search_lower in current_name
