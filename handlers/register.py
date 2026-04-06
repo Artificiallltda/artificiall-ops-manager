@@ -27,23 +27,15 @@ def parse_register_command(args: List[str]) -> Optional[dict]:
     if len(args) < 5:
         return None
 
-    # 1. Username
-    username_arg = args[0]
-    username = None
-    if username_arg.startswith("@"):
-        username = username_arg[1:]
-        args = args[1:]
-
-    # Join the rest to search using regex
     text = " ".join(args)
 
-    # 2. Email
+    # 1. Email
     email_match = re.search(r"[\w.+-]+@[\w.-]+\.\w+", text)
     if not email_match:
         return None
     email = email_match.group(0)
 
-    # 3. Telefone: procura por um + seguido por digitos, espacos e hifens.
+    # 2. Telefone
     phone_match = re.search(r"\+[\d\s\-]{10,20}", text)
     if not phone_match:
         return None
@@ -54,9 +46,23 @@ def parse_register_command(args: List[str]) -> Optional[dict]:
         return None
     numero = "+" + numero_digits
 
+    # 3. Username - Procura por um token q comece com @ mas nao seja o email
+    username = None
+    for word in text.split():
+        if word.startswith('@') and word != email:
+            username = word[1:]
+            break
+
     # 4. Nome e Cargo
-    phone_start = text.find(phone_match.group(0))
-    nome = text[:phone_start].strip()
+    # Nome é tudo o que vem antes do telefone, e se o username estiver lá, a gente extrai ele fisicamente fora do nome
+    phone_start = text.find(numero_raw)
+    nome_part = text[:phone_start].strip()
+
+    if username:
+        # Remover o username do nome pra não ficar salvo como "Ana Julia @anajuliayst"
+        nome_part = re.sub(r'@' + re.escape(username), '', nome_part, flags=re.IGNORECASE).strip()
+    
+    nome = nome_part
 
     email_end = text.find(email) + len(email)
     cargo = text[email_end:].strip()

@@ -31,31 +31,38 @@ def parse_update_command(args: List[str]) -> Optional[dict]:
     campo = ""
     novo_valor = ""
 
-    # Extrair search_term se estiver entre aspas duplas, caso contrário pega o primeiro token
+    valid_fields = ["email", "cargo", "numero", "nome", "username"]
+
+    # Extrair search_term se estiver entre aspas duplas, caso contrário busca pelo nome do campo
     if texto.startswith('"'):
         end_quote = texto.find('"', 1)
         if end_quote != -1:
-            search_term = texto[1:end_quote]
+            search_term = texto[1:end_quote].strip()
             rest = texto[end_quote + 1:].strip().split(" ", 1)
             if len(rest) == 2:
                 campo, novo_valor = rest
         else:
             return None
     else:
-        tokens = texto.split(" ", 2)
-        if len(tokens) == 3:
-            search_term, campo, novo_valor = tokens
-        else:
-            return None
+        tokens = texto.split()
+        for i, token in enumerate(tokens):
+            if token.lower() in valid_fields:
+                search_term = " ".join(tokens[:i]).strip()
+                campo = token.lower()
+                novo_valor = " ".join(tokens[i+1:]).strip()
+                break
+                
+    if not search_term or not campo or not novo_valor:
+        return None
 
     # Se usou @ no começo, vamos tirar
     if search_term.startswith("@"):
         search_term = search_term[1:]
 
     return {
-        "search_term": search_term.strip(),
-        "campo": campo.strip().lower(),
-        "novo_valor": novo_valor.strip()
+        "search_term": search_term,
+        "campo": campo,
+        "novo_valor": novo_valor
     }
 
 
